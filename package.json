@@ -1,0 +1,36 @@
+{
+  "name": "hyper-webrtc",
+  "version": "0.0.0",
+  "description": "WebRTC tools for the hypercore-protocol stack",
+  "main": "index.js",
+  "scripts": {
+    "test": "standard"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LuKks/hyper-webrtc.git"
+  },
+  "author": "Lucas Barrena (LuKks)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/LuKks/hyper-webrtc/issues"
+  },
+  "homepage": "https://github.com/LuKks/hyper-webrtc#readme",
+  "devDependencies": {
+    "brittle": "^3.3.2",
+    "standard": "^17.1.0"
+  },
+  "dependencies": {
+    "@hyperswarm/dht-relay": "^0.4.3",
+    "b4a": "^1.6.4",
+    "compact-encoding": "^2.13.0",
+    "hypercore": "^10.32.5",
+    "hypercore-crypto": "^3.4.0",
+    "hyperswarm": "^4.7.13",
+    "peerjs": "^1.5.2",
+    "protomux": "^3.5.1",
+    "random-access-memory": "^6.2.0",
+    "sodium-universal": "^4.0.0",
+    "ws": "^8.16.0"
+  }
+}
