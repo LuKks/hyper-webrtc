@@ -184,15 +184,14 @@ module.exports = class WebPeer extends ReadyResource {
 
 function waitForRemote (remote) {
   return new Promise(resolve => {
-    this.remote.on('open', done)
-    this.remote.on('open', done)
-    this.remote.on('error', done)
-    this.remote.on('close', done)
+    remote.on('open', done)
+    remote.on('error', done)
+    remote.on('close', done)
 
     function done () {
-      this.remote.off('open', done)
-      this.remote.off('error', done)
-      this.remote.off('close', done)
+      remote.off('open', done)
+      remote.off('error', done)
+      remote.off('close', done)
 
       resolve()
     }
