@@ -4,7 +4,7 @@
   "description": "WebRTC tools for the hypercore-protocol stack",
   "main": "index.js",
   "scripts": {
-    "test": "standard"
+    "test": "standard && brittle test.js"
   },
   "repository": {
     "type": "git",
@@ -24,13 +24,15 @@
     "@hyperswarm/dht-relay": "^0.4.3",
     "b4a": "^1.6.4",
     "compact-encoding": "^2.13.0",
-    "hypercore": "^10.32.5",
+    "hypercore": "^10.32.6",
     "hypercore-crypto": "^3.4.0",
+    "hyperdht": "^6.11.5",
     "hyperswarm": "^4.7.13",
-    "peerjs": "^1.5.2",
     "protomux": "^3.5.1",
     "random-access-memory": "^6.2.0",
+    "ready-resource": "^1.0.0",
     "sodium-universal": "^4.0.0",
+    "werift": "^0.19.0",
     "ws": "^8.16.0"
   }
 }
