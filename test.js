@@ -41,9 +41,14 @@ async function writer (t, { relayAddress }) {
   swarm.on('connection', function (signal) {
     const peer = new HyperWebRTC(signal)
 
+    // t.teardown(() => peer.close())
+
     peer.on('continue', function (stream) {
       console.log('core replicate')
-      core.replicate(stream)
+      t.teardown(() => stream.destroy())
+
+      const s = core.replicate(stream)
+      stream.on('close', () => s.destroy())
     })
   })
   const discoveryWeb = crypto.discoveryKey(core.discoveryKey)
@@ -71,9 +76,14 @@ async function reader (t, key, { relayAddress }) {
   swarm.on('connection', function (signal) {
     const peer = new HyperWebRTC(signal)
 
+    // t.teardown(() => peer.close())
+
     peer.on('continue', function (stream) {
       console.log('clone replicate')
-      clone.replicate(stream)
+      t.teardown(() => stream.destroy())
+
+      const s = clone.replicate(stream)
+      stream.on('close', () => s.destroy())
     })
   })
   const discoveryWeb = crypto.discoveryKey(clone.discoveryKey)
@@ -88,27 +98,29 @@ async function reader (t, key, { relayAddress }) {
 function createRelayClient (t, relayAddress) {
   const ws = new WebSocket(relayAddress)
   const dht = new DHTRelay(new Stream(true, ws))
+  // TODO: dht-relay does not have 'close' event
 
-  t.teardown(() => dht.destroy(), { order: Infinity })
+  t.teardown(() => dht.destroy({ force: true }), { order: Infinity })
 
   return dht
 }
 
 function createRelayServer (t, { bootstrap }) {
-  // const dht = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-
   const dht = new DHT({ bootstrap })
   const server = new WebSocketServer({ port: 0 })
+  const connections = new Set()
 
   server.on('connection', function (socket) {
+    connections.add(socket)
+    socket.on('close', () => connections.delete(socket))
+
     relay(dht, new Stream(false, socket))
   })
 
-  // await waitForServer(server)
-
   t.teardown(async function () {
-    console.log('teardown')
-    await new Promise(resolve => server.close(resolve))
+    const closing = new Promise(resolve => server.close(resolve))
+    for (const socket of connections) socket.terminate()
+    await closing
     await dht.destroy()
   })
 
@@ -122,18 +134,3 @@ async function createBootstrap (t) {
 
   return testnet.bootstrap
 }
-
-/* function waitForServer (server) {
-  return new Promise((resolve, reject) => {
-    server.on('listening', done)
-    server.on('error', done)
-
-    function done (err) {
-      server.off('listening', done)
-      server.off('error', done)
-
-      if (err) reject(err)
-      else resolve()
-    }
-  })
-} */

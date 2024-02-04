@@ -52,8 +52,8 @@ module.exports = class WebPeer extends ReadyResource {
   }
 
   _close () {
-    // this.peer.destroy()
-    // if (this.mux) this.mux.destroy()
+    console.log('_closed')
+    this.peer.close()
     this.stream.destroy()
   }
 
@@ -67,9 +67,12 @@ module.exports = class WebPeer extends ReadyResource {
         handshakeHash: this.mux.stream.handshakeHash
       }) // new SecretStream(false, rawStream)
 
-      this.remote.once('connect', () => {
-        this.emit('continue', this.remote) // TODO: It should be a Duplex to avoid this event
+      this.remote.on('close', () => {
+        console.log('remote closed')
+        this.close().catch(safetyCatch)
       })
+
+      this.emit('continue', this.remote) // TODO: It should be a Duplex to avoid this event
     }
 
     if (this.mux.stream.isInitiator) {
@@ -88,14 +91,12 @@ module.exports = class WebPeer extends ReadyResource {
     }
   }
 
-  _onwireice ({ ice }) {
-    this.peer.addIceCandidate(new RTCIceCandidate(ice))
+  async _onwireice ({ ice }) {
+    await this.peer.addIceCandidate(new RTCIceCandidate(ice))
   }
 
   async _onwireoffer ({ offer }) {
-    // TODO: Only once
-
-    this.peer.setRemoteDescription(offer)
+    await this.peer.setRemoteDescription(offer)
 
     const answer = await this.peer.createAnswer()
     await this.peer.setLocalDescription(answer)
@@ -103,8 +104,8 @@ module.exports = class WebPeer extends ReadyResource {
     this.channel.messages[2].send({ answer: this.peer.localDescription })
   }
 
-  _onwireanswer ({ answer }) {
-    this.peer.setRemoteDescription(answer)
+  async _onwireanswer ({ answer }) {
+    await this.peer.setRemoteDescription(answer)
   }
 
   _onmuxerror (err) {
@@ -114,8 +115,9 @@ module.exports = class WebPeer extends ReadyResource {
   _onmuxclose (isRemote) {
     console.log('_onmuxclose', { isRemote }, 'Stream created?', !!this.remote)
 
-    // if (!this.remote) this.peer.destroy()
-    // this.mux.destroy()
+    if (!this.remote) this.peer.close()
+
+    this.stream.destroy()
   }
 }
 
