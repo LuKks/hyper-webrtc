@@ -19,9 +19,9 @@ module.exports = class WebPeer {
 
     if (this._channel === null) throw new Error('Channel duplicated')
 
-    this._ice = this._channel.addMessage({ encoding: c.any, onmessage: this._onice.bind(this) })
-    this._offer = this._channel.addMessage({ encoding: c.any, onmessage: this._onoffer.bind(this) })
-    this._answer = this._channel.addMessage({ encoding: c.any, onmessage: this._onanswer.bind(this) })
+    this._ice = this._channel.addMessage({ encoding: c.json, onmessage: this._onice.bind(this) })
+    this._offer = this._channel.addMessage({ encoding: c.json, onmessage: this._onoffer.bind(this) })
+    this._answer = this._channel.addMessage({ encoding: c.json, onmessage: this._onanswer.bind(this) })
 
     this._channel.open()
 
