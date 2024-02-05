@@ -1,4 +1,4 @@
-const { RTCPeerConnection, RTCIceCandidate } = require('werift')
+const { RTCPeerConnection, RTCIceCandidate } = require('get-webrtc')
 const Protomux = require('protomux')
 const c = require('compact-encoding')
 const safetyCatch = require('safety-catch')
@@ -13,7 +13,7 @@ module.exports = class WebPeer {
   constructor (relay) {
     this._rtc = new RTCPeerConnection({ iceServers })
     this._relay = relay
-    this._mux = new Protomux(relay) // Protomux.from
+    this._mux = Protomux.from(relay)
 
     this._channel = this._mux.createChannel({ protocol: 'hyper-webrtc/signal' })
 
