@@ -17,7 +17,6 @@
   },
   "homepage": "https://github.com/LuKks/hyper-webrtc#readme",
   "dependencies": {
-    "@hyperswarm/dht-relay": "^0.4.3",
     "b4a": "^1.6.4",
     "compact-encoding": "^2.13.0",
     "get-webrtc": "^1.0.1",
@@ -26,6 +25,7 @@
     "streamx": "^2.15.7"
   },
   "devDependencies": {
+    "@hyperswarm/dht-relay": "^0.4.3",
     "brittle": "^3.3.2",
     "hypercore": "^10.32.6",
     "hypercore-crypto": "^3.4.0",
