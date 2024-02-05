@@ -2,125 +2,83 @@ const { RTCPeerConnection, RTCIceCandidate } = require('werift')
 const Protomux = require('protomux')
 const c = require('compact-encoding')
 const safetyCatch = require('safety-catch')
-const ReadyResource = require('ready-resource')
 const WebStream = require('./lib/web-stream.js')
 
+// TODO: Investigate how to deploy STUN servers
 const iceServers = [
   { urls: 'stun:stun.l.google.com:19302' }
 ]
 
-// TODO: This could be a Duplex but don't know about that, for now emitting an event is good enough
-module.exports = class WebPeer extends ReadyResource {
-  constructor (stream) {
-    super()
+module.exports = class WebPeer {
+  constructor (relay) {
+    this._rtc = new RTCPeerConnection({ iceServers })
+    this._relay = relay
+    this._mux = new Protomux(relay) // Protomux.from
 
-    this.peer = new RTCPeerConnection({ iceServers })
-    this.stream = stream
-    this.mux = null // new Protomux(stream)
-    this.channel = null
-    this.remote = null
+    this._channel = this._mux.createChannel({ protocol: 'hyper-webrtc/signal' })
 
-    this.peer.onicecandidate = onicecandidate.bind(this)
+    if (this._channel === null) throw new Error('Channel duplicated')
 
-    this.ready().catch(safetyCatch)
+    this._ice = this._channel.addMessage({ encoding: c.any, onmessage: this._onice.bind(this) })
+    this._offer = this._channel.addMessage({ encoding: c.any, onmessage: this._onoffer.bind(this) })
+    this._answer = this._channel.addMessage({ encoding: c.any, onmessage: this._onanswer.bind(this) })
+
+    this._channel.open()
+
+    this._rtc.onicecandidate = onicecandidate.bind(this)
   }
 
-  async _open () {
-    this.mux = new Protomux(this.stream)
+  static from (relay) {
+    const peer = new this(relay)
 
-    this.channel = this.mux.createChannel({
-      protocol: 'hyper-webrtc/signaling',
-      id: null,
-      handshake: c.json, // TODO: Make strict messages
-      onopen: this._onmuxopen.bind(this),
-      onerror: this._onmuxerror.bind(this),
-      onclose: this._onmuxclose.bind(this),
-      messages: [
-        { encoding: c.json, onmessage: this._onwireice.bind(this) },
-        { encoding: c.json, onmessage: this._onwireoffer.bind(this) },
-        { encoding: c.json, onmessage: this._onwireanswer.bind(this) }
-      ]
+    const rawStream = peer._rtc.createDataChannel('wire', { negotiated: true, id: 0 })
+
+    const stream = new WebStream(relay.isInitiator, rawStream, {
+      handshakeHash: relay.handshakeHash
     })
 
-    this.channel.userData = this
-
-    this.channel.open({
-      // isInitiator: this.mux.stream.isInitiator,
+    relay.on('close', () => {
+      peer._rtc.close()
+      rawStream.close()
     })
 
-    // TODO: Maximize speed at connecting, e.g. don't wait until open
+    stream.on('close', () => {
+      peer._rtc.close()
+      relay.destroy()
+    })
+
+    peer.negotiate().catch(safetyCatch)
+
+    return stream
   }
 
-  _close () {
-    console.log('_closed')
-    this.peer.close()
-    this.stream.destroy()
+  async negotiate () {
+    if (!this._relay.isInitiator) return
+
+    const offer = await this._rtc.createOffer()
+    await this._rtc.setLocalDescription(offer)
+
+    this._offer.send({ offer: this._rtc.localDescription })
   }
 
-  async _onmuxopen (handshake) {
-    console.log('_onmuxopen', handshake)
-
-    // const rawStream = this.peer.createDataChannel('wire', { negotiated: true, id: 0 })
-
-    const done = (rawStream) => {
-      this.remote = new WebStream(this.mux.stream.isInitiator, rawStream, {
-        handshakeHash: this.mux.stream.handshakeHash
-      }) // new SecretStream(false, rawStream)
-
-      this.remote.on('close', () => {
-        console.log('remote closed')
-        this.close().catch(safetyCatch)
-      })
-
-      this.emit('continue', this.remote) // TODO: It should be a Duplex to avoid this event
-    }
-
-    if (this.mux.stream.isInitiator) {
-      const rawStream = this.peer.createDataChannel('wire')
-      done(rawStream)
-
-      const offer = await this.peer.createOffer()
-      await this.peer.setLocalDescription(offer)
-
-      this.channel.messages[1].send({ offer: this.peer.localDescription })
-    } else {
-      this.peer.ondatachannel = (e) => {
-        const rawStream = e.channel
-        done(rawStream)
-      }
-    }
+  async _onice ({ ice }) {
+    await this._rtc.addIceCandidate(new RTCIceCandidate(ice))
   }
 
-  async _onwireice ({ ice }) {
-    await this.peer.addIceCandidate(new RTCIceCandidate(ice))
+  async _onoffer ({ offer }) {
+    await this._rtc.setRemoteDescription(offer)
+
+    const answer = await this._rtc.createAnswer()
+    await this._rtc.setLocalDescription(answer)
+
+    this._answer.send({ answer: this._rtc.localDescription })
   }
 
-  async _onwireoffer ({ offer }) {
-    await this.peer.setRemoteDescription(offer)
-
-    const answer = await this.peer.createAnswer()
-    await this.peer.setLocalDescription(answer)
-
-    this.channel.messages[2].send({ answer: this.peer.localDescription })
-  }
-
-  async _onwireanswer ({ answer }) {
-    await this.peer.setRemoteDescription(answer)
-  }
-
-  _onmuxerror (err) {
-    console.error('_onmuxerror', err)
-  }
-
-  _onmuxclose (isRemote) {
-    console.log('_onmuxclose', { isRemote }, 'Stream created?', !!this.remote)
-
-    if (!this.remote) this.peer.close()
-
-    this.stream.destroy()
+  async _onanswer ({ answer }) {
+    await this._rtc.setRemoteDescription(answer)
   }
 }
 
 function onicecandidate (e) {
-  if (e.candidate) this.channel.messages[0].send({ ice: e.candidate })
+  if (e.candidate) this._ice.send({ ice: e.candidate })
 }

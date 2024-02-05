@@ -13,10 +13,11 @@ const Hypercore = require('hypercore')
 const RAM = require('random-access-memory')
 const crypto = require('hypercore-crypto')
 const HypercoreId = require('hypercore-id-encoding')
+const b4a = require('b4a')
 const HyperWebRTC = require('./index.js')
 
 test('basic', async function (t) {
-  // t.plan(1)
+  t.plan(3)
 
   const bootstrap = await createBootstrap(t)
   const relayAddress = createRelayServer(t, { bootstrap })
@@ -24,8 +25,6 @@ test('basic', async function (t) {
   const key = await writer(t, { relayAddress })
 
   await reader(t, key, { relayAddress })
-
-  // await new Promise(resolve => setTimeout(resolve, 5000))
 })
 
 async function writer (t, { relayAddress }) {
@@ -38,27 +37,15 @@ async function writer (t, { relayAddress }) {
   t.teardown(() => core.close())
 
   const done = core.findingPeers()
-  swarm.on('connection', function (signal) {
-    const peer = new HyperWebRTC(signal)
-
-    // t.teardown(() => peer.close())
-
-    peer.on('continue', function (stream) {
-      console.log('core replicate')
-      t.teardown(() => stream.destroy())
-
-      const s = core.replicate(stream)
-      stream.on('close', () => s.destroy())
-    })
+  swarm.on('connection', function (relay) {
+    const rtc = HyperWebRTC.from(relay)
+    core.replicate(rtc)
   })
   const discoveryWeb = crypto.discoveryKey(core.discoveryKey)
   const discovery = swarm.join(discoveryWeb)
   swarm.flush().then(done, done)
 
   await discovery.flushed()
-  console.log('Fully announced')
-
-  console.log('Writer ID', core.id)
 
   return core.id
 }
@@ -73,26 +60,17 @@ async function reader (t, key, { relayAddress }) {
   t.teardown(() => clone.close())
 
   const done = clone.findingPeers()
-  swarm.on('connection', function (signal) {
-    const peer = new HyperWebRTC(signal)
-
-    // t.teardown(() => peer.close())
-
-    peer.on('continue', function (stream) {
-      console.log('clone replicate')
-      t.teardown(() => stream.destroy())
-
-      const s = clone.replicate(stream)
-      stream.on('close', () => s.destroy())
-    })
+  swarm.on('connection', function (relay) {
+    const rtc = HyperWebRTC.from(relay)
+    clone.replicate(rtc)
   })
   const discoveryWeb = crypto.discoveryKey(clone.discoveryKey)
   swarm.join(discoveryWeb)
   swarm.flush().then(done, done)
 
-  console.log(await clone.get(0))
-  console.log(await clone.get(1))
-  console.log(await clone.get(2))
+  t.alike(await clone.get(0), b4a.from('a'))
+  t.alike(await clone.get(1), b4a.from('b'))
+  t.alike(await clone.get(2), b4a.from('c'))
 }
 
 function createRelayClient (t, relayAddress) {
@@ -100,7 +78,7 @@ function createRelayClient (t, relayAddress) {
   const dht = new DHTRelay(new Stream(true, ws))
   // TODO: dht-relay does not have 'close' event
 
-  t.teardown(() => dht.destroy({ force: true }), { order: Infinity })
+  t.teardown(() => dht.destroy(), { order: Infinity })
 
   return dht
 }
