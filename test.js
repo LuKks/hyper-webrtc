@@ -16,7 +16,7 @@ const HypercoreId = require('hypercore-id-encoding')
 const b4a = require('b4a')
 const HyperWebRTC = require('./index.js')
 
-test('basic', async function (t) {
+test('core replicate', async function (t) {
   t.plan(3)
 
   const bootstrap = await createBootstrap(t)
@@ -25,6 +25,46 @@ test('basic', async function (t) {
   const key = await writer(t, { relayAddress })
 
   await reader(t, key, { relayAddress })
+})
+
+test('dht server and client', async function (t) {
+  t.plan(8)
+
+  const bootstrap = await createBootstrap(t)
+  const relayAddress = createRelayServer(t, { bootstrap })
+
+  const expected = ['a', 'b', 'c']
+
+  const node = createRelayClient(t, relayAddress)
+  const server = node.createServer()
+
+  server.on('connection', function (relay) {
+    const rtc = HyperWebRTC.from(relay)
+
+    t.alike(rtc.publicKey, relay.publicKey)
+    t.alike(rtc.remotePublicKey, relay.remotePublicKey)
+
+    rtc.on('data', function (data) {
+      t.alike(data, b4a.from(expected.shift()))
+    })
+  })
+
+  await server.listen()
+
+  const anotherNode = createRelayClient(t, relayAddress)
+  const relay = anotherNode.connect(server.publicKey)
+  const rtc = HyperWebRTC.from(relay)
+
+  t.alike(rtc.publicKey, relay.publicKey)
+  t.alike(rtc.remotePublicKey, relay.remotePublicKey)
+
+  rtc.on('open', function () {
+    t.pass()
+  })
+
+  for (const data of expected) {
+    rtc.write(data)
+  }
 })
 
 async function writer (t, { relayAddress }) {

@@ -34,6 +34,8 @@ module.exports = class WebPeer {
     const rawStream = peer._rtc.createDataChannel('wire', { negotiated: true, id: 0 })
 
     const stream = new WebStream(relay.isInitiator, rawStream, {
+      publicKey: relay.publicKey,
+      remotePublicKey: relay.remotePublicKey,
       handshakeHash: relay.handshakeHash
     })
 
