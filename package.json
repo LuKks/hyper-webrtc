@@ -1,6 +1,6 @@
 {
   "name": "hyper-webrtc",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "WebRTC tools for the hypercore-protocol stack",
   "main": "index.js",
   "scripts": {
