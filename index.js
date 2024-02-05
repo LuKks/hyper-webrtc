@@ -5,13 +5,13 @@ const safetyCatch = require('safety-catch')
 const WebStream = require('./lib/web-stream.js')
 
 // TODO: Investigate how to deploy STUN servers
-const iceServers = [
+const ICES = [
   { urls: 'stun:stun.l.google.com:19302' }
 ]
 
 module.exports = class WebPeer {
-  constructor (relay) {
-    this._rtc = new RTCPeerConnection({ iceServers })
+  constructor (relay, opts = {}) {
+    this._rtc = new RTCPeerConnection({ iceServers: opts.iceServers || ICES })
     this._relay = relay
     this._mux = Protomux.from(relay)
 
